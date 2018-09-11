@@ -20,13 +20,15 @@ namespace Nonon
         SocketTextChannel log;
         Data data;
         Storer storer = new Storer();
+        Personality me = new Personality();
+        Functions statistics = new Functions();
 
         public static void Main(string[] args)
             => new Program().MainAsync().GetAwaiter().GetResult();
+
         public async Task MainAsync()
         {
             client = new DiscordSocketClient();
-
             //load bot token.
             if (File.Exists(@"c:\nonon\token.txt")) {
                 token = File.ReadAllText(@"C:\nonon\token.txt");
@@ -59,7 +61,8 @@ namespace Nonon
                 Console.WriteLine("Connected on " + guild.Name);
                 log = guild.GetTextChannel(logChannel);
                 Console.WriteLine("Log channel name is " +log.Name);
-                await Say(log as SocketTextChannel, "hallo friends");
+                var time = DateTime.Now;
+                await Say(log as SocketTextChannel, "New launch "+ time.ToString("g")+" >> "+me.getGreeting());
                 //return Task.CompletedTask;
             };
             // Block this task until the program is closed.
@@ -132,25 +135,25 @@ namespace Nonon
                                         command.Get(); //remove the mention
                                         if (command.Find("help")) {
                                             await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break lol.");
+                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
                                             string s = "Here are my commands.\n" +
                                                 "They work in a logical way. Ask for an item to see the counts of that item on the server.\n" +
                                                 "Item can be users, channels, reacts, or mentions.\n" +
                                                 "add 'in <channel name>' to an item command to see just the items occurring in that channel.\n" +
                                                 "add 'by <user name>' to an item command to see just the items produced by that user.\n\n" +
-                                                "help\t\tView this list.\n" +
-                                                "me\t\tShows your stats.\n" +
-                                                "<item>\t\tShows stats for this kind of item.\n" +
-                                                "top <item>\t\tShows the top 10 of the item.\n" +
+                                                "**help**\t\tView this list.\n" +
+                                                "**me**\t\tShows your stats.\n" +
+                                                "~~<item>\t\tShows stats for this kind of item.~~\n" +
+                                                "**top <item>**\t\tShows the top 10 of the item.\n" +
                                                 "\t\t\tYou may also use 'in' and 'by' keywords for this command.\n" +
-                                                "user <username>\t\tShows the stats for this user.\n" +
-                                                "channel <channelname>\t\tShows the stats for this channel.\n" +
-                                                "server\t\tShows the stats for the server.\n" +
-                                                "friendships\t\tShows the biggest friendships on the server.\n";
+                                                "~~user <username>\t\tShows the stats for this user.~~\n" +
+                                                "~~channel <channelname>\t\tShows the stats for this channel.~~\n" +
+                                                "~~server\t\tShows the stats for the server.~~\n" +
+                                                "~~friendships\t\tShows the biggest friendships on the server.~~\n";
                                             await DirectSay(message.Author, s);
                                         } else if (command.Find("me")) {
                                             Data.User me = null;
-                                            string say = "";
+                                            string say = ""; string phrase = "";  int i = 0;
                                             foreach (var user in data.users) {
                                                 if (user.id == message.Author.Id) {
                                                     me = user;
@@ -172,13 +175,54 @@ namespace Nonon
                                                         var channel = guild.GetChannel(bc.id);
                                                         float percent = bc.messageCount / bcm * 100;
                                                         say += "Your busiest channel is " + channel.Name + ", and you have sent " + bcm + " messages there.\n" +
-                                                            "That's " + percent + "% of that channel's discussion.";
+                                                            "That's " + percent + "% of that channel's discussion.\n";
                                                     }
-                                                    //todo: find favourite reaction
+
+                                                    //find favourite reaction
+                                                    Dictionary<string, int> reactionsDict = new Dictionary<string, int>();
+                                                    foreach (var reaction in user.reactions) {
+                                                        if (!reactionsDict.ContainsKey(reaction.emotename)) {
+                                                            reactionsDict.Add(reaction.emotename, 0);
+                                                        }
+                                                        reactionsDict[reaction.emotename]++;
+                                                    }
+                                                    if (reactionsDict.Count != 0) {
+                                                        //sort by frequency
+                                                        var reactionsList = reactionsDict.ToList();
+                                                        reactionsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                                                        if (reactionsList.Count != 0) {
+                                                            foreach (var reaction in reactionsList) {
+                                                                i++; if (i > 20) { break; }
+                                                                phrase += i + "\t\t" + reaction.Key + "\t\tused " + reaction.Value + " times\n";
+                                                            }
+                                                        say += "\nYour top " + i + " favourite reactions are:\n" + phrase;
+                                                        }
+                                                    }
+                                                    //find favourite mention
+                                                    Dictionary<ulong, int> mentionsDict = new Dictionary<ulong, int>();
+                                                    foreach (var mention in user.mentions) {
+                                                        if (!mentionsDict.ContainsKey(mention.mentionedId)) {
+                                                            mentionsDict.Add(mention.mentionedId, 0);
+                                                        }
+                                                        mentionsDict[mention.mentionedId]++;
+                                                    }
+                                                    if (mentionsDict.Count != 0) {
+                                                        i = 0;phrase = "";
+                                                        //sort by frequency
+                                                        var mentionsList = mentionsDict.ToList();
+                                                        mentionsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                                                        if (mentionsList.Count != 0) {
+                                                            foreach (var mention in mentionsList) {
+                                                                i++; if (i > 20) { break; }
+                                                                phrase += i + "\t\t" + mention.Key + "\t\tmentioned " + mention.Value + " times\n";
+                                                            }
+                                                            say += "\nYour " + i + " best friends are:\n" + phrase;
+                                                        }
+                                                    }
                                                 }
                                             }
                                             if (me == null) {
-                                                say = "Sorry, I don't have information about you.";
+                                                say = "Sorry, I don't have any information about you.";
                                             }
                                             await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
                                         } else if (command.Find("top")) {
@@ -204,6 +248,7 @@ namespace Nonon
                                                 //they specified a user so let's go find it
                                                 foreach (var user in guild.Users) {
                                                     if (user.Username == query || user.Nickname == query || user.Mention == query) {
+                                                        Console.WriteLine("Located that user.");
                                                         byUser = user;
                                                     }
                                                 }
@@ -213,290 +258,33 @@ namespace Nonon
                                                 //they specified a channel so let's go find it
                                                 foreach (var channel in guild.TextChannels) {
                                                     if (channel.Mention == query || channel.Name == query) {
+                                                        Console.WriteLine("Located that channel.");
                                                         inChannel = channel;
                                                     }
                                                 }
                                             }
-                                            Dictionary<ulong, int> ids;
-                                            List<KeyValuePair<ulong, int>> idlist;
                                             switch (selectedItem) {
-                                                case "channel":
-                                                    //TOP CHANNELS
-                                                    //construct channel dictionary
-                                                    ids = new Dictionary<ulong, int>();
-                                                    foreach (var channel in data.channels) {
-                                                        ids.Add(channel.id, channel.messageCount);
-                                                    }
-                                                    //sort by frequency
-                                                    idlist = ids.ToList();
-                                                    idlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                    //print
-                                                    i = 0; say = "";
-                                                    foreach (var item in idlist) {
-                                                        i++; if (i > 10) { break; }
-                                                        say += i + "\t\t" + guild.GetChannel(item.Key).Name + "\t\twith" + item.Value + " messages\n";
-                                                    }
-                                                    say = "The top " + i + " most used channels are:\n" + say;
-                                                    break;
-                                                case "user":
-                                                    //construct user dictionary
-                                                    ids = null;
-                                                    if (inChannel != null) {
-                                                        //TOP USERS
-                                                        ids = new Dictionary<ulong, int>();
-                                                        foreach (var user in data.users) {
-                                                            ids.Add(user.id, user.messagesSent);
-                                                        }
-                                                    } else {
-                                                        //TOP USERS IN CHANNEL
-                                                        foreach (var channel in data.channels) {
-                                                            if (channel.id == inChannel.Id) {
-                                                                ids = new Dictionary<ulong, int>();
-                                                                foreach (var user in channel.containedUsers) {
-                                                                    ids.Add(user.id, user.messagesSent);
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    if (ids != null) {
-                                                        //sort by frequency
-                                                        idlist = ids.ToList();
-                                                        idlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                        //print
-                                                        i = 0; say = "";
-                                                        foreach (var item in idlist) {
-                                                            i++; if (i > 10) { break; }
-                                                            say += i + "\t\t" + guild.GetChannel(item.Key).Name + "\t\twith" + item.Value + " messages\n";
-                                                        }
-                                                        say = "The top " + i + " most active users" + (inChannel == null ? " " : " in " + inChannel.Name + " ") + "are:\n" + say;
-                                                    }
-                                                    break;
-                                                case "mention":
-                                                    //construct mention dictionary
-                                                    ids = null; //dictionary is users mentioned by frequency
-                                                    if (byUser == null) {
-                                                        if (inChannel == null) {
-                                                            //TOP MENTIONS 
-                                                            ids = new Dictionary<ulong, int>();
-                                                            foreach (var mention in data.mentions) {
-                                                                if (!ids.ContainsKey(mention.mentionedId)) {
-                                                                    ids.Add(mention.mentionedId, 0);
-                                                                }
-                                                                ids[mention.mentionedId]++;
-                                                            }
-                                                        } else {
-                                                            //TOP MENTIONS IN CHANNEL
-                                                            foreach (var channel in data.channels) {
-                                                                if (channel.id == inChannel.Id) {
-                                                                    ids = new Dictionary<ulong, int>();
-                                                                    foreach (var mention in channel.containedMentions) {
-                                                                        if (!ids.ContainsKey(mention.mentionedId)) {
-                                                                            ids.Add(mention.mentionedId, 0);
-                                                                        }
-                                                                        ids[mention.mentionedId]++;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (inChannel == null) {
-                                                            //TOP MENTIONS BY USER
-                                                            foreach (var user in data.users) {
-                                                                if (user.id == byUser.Id) {
-                                                                    ids = new Dictionary<ulong, int>();
-                                                                    foreach (var mention in user.mentions) {
-                                                                        if (!ids.ContainsKey(mention.mentionedId)) {
-                                                                            ids.Add(mention.mentionedId, 0);
-                                                                        }
-                                                                        ids[mention.mentionedId]++;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            //TOP MENTIONS BY USER IN CHANNEL
-                                                            foreach (var channel in data.channels) {
-                                                                if (channel.id == inChannel.Id) {
-                                                                    foreach (var user in channel.containedUsers) {
-                                                                        if (user.id == byUser.Id) {
-                                                                            ids = new Dictionary<ulong, int>();
-                                                                            foreach (var mention in user.mentions) {
-                                                                                if (!ids.ContainsKey(mention.mentionedId)) {
-                                                                                    ids.Add(mention.mentionedId, 0);
-                                                                                }
-                                                                                ids[mention.mentionedId]++;
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    if (ids != null) {
-                                                        //sort by frequency
-                                                        idlist = ids.ToList();
-                                                        idlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                        //print
-                                                        i = 0; say = "";
-                                                        foreach (var item in idlist) {
-                                                            i++; if (i > 10) { break; }
-                                                            say += i + "\t\t" + guild.GetChannel(item.Key).Name + "\t\twith" + item.Value + " messages\n";
-                                                        }
-                                                        say = "The top " + i + " most common mentions" + (byUser == null ? "" : " by " + byUser.Username + " ") +
-                                                             (inChannel == null ? " " : " in " + inChannel.Name + " ") + "are:\n" + say;
-                                                    }
-                                                    break;
-                                                case "reaction":
-                                                    //construct reaction dictionary
-                                                    Dictionary<string, int> strings = null;
-                                                    List<KeyValuePair<string, int>> stringlist;
-                                                    if (byUser == null) {
-                                                        if (inChannel == null) {
-                                                            //TOP REACTIONS 
-                                                            say = "Here are the top reactions stats.\n";
-                                                            string t = "";
-                                                            //TOP REACTIONS > MOST USED REACTS
-                                                            strings = new Dictionary<string, int>(); //emote name by frequency
-                                                            foreach (var reaction in data.reactions) {
-                                                                if (!strings.ContainsKey(reaction.emotename)) {
-                                                                    strings.Add(reaction.emotename, 0);
-                                                                }
-                                                                strings[reaction.emotename]++;
-                                                            }
-                                                            if (strings != null) {
-                                                                //sort by frequency
-                                                                stringlist = strings.ToList();
-                                                                stringlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                                //print
-                                                                i = 0;
-                                                                foreach (var item in stringlist) {
-                                                                    i++; if (i > 10) { break; }
-                                                                    t += i + "\t\t" + item.Key + " has been used " + item.Value + " times\n";
-                                                                }
-                                                                say += "The top " + i + " most used reacts are:\n" + t;
-                                                            }
-                                                            //TOP REACTIONS > MOST REACTING USERS
-                                                            t = "";
-                                                            ids = new Dictionary<ulong, int>(); //reaction author by frequency
-                                                            foreach (var reaction in data.reactions) {
-                                                                if (!ids.ContainsKey(reaction.userId)) {
-                                                                    ids.Add(reaction.userId, 0);
-                                                                }
-                                                                ids[reaction.userId]++;
-                                                            }
-                                                            if (ids != null) {
-                                                                //sort by frequency
-                                                                idlist = ids.ToList();
-                                                                idlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                                //print
-                                                                i = 0;
-                                                                foreach (var item in idlist) {
-                                                                    i++; if (i > 10) { break; }
-                                                                    t += i + "\t\t" + guild.GetUser(item.Key).Username + " has posted " + item.Value + " reactions\n";
-                                                                }
-                                                                say += "\nThe top " + i + " reacting users are:\n" + t;
-                                                            }
-                                                        } else {
-                                                            //TOP REACTIONS IN CHANNEL 
-                                                            foreach (var channel in data.channels) {
-                                                                if (channel.id == inChannel.Id) {
-                                                                    say = "Here are the reactions stats for " + inChannel.Name + ". \n";
-                                                                    string t = "";
-                                                                    //TOP REACTIONS IN CHANNEL > MOST USED REACTS
-                                                                    strings = new Dictionary<string, int>(); //emote name by frequency
-                                                                    foreach (var reaction in channel.containedReactions) {
-                                                                        if (!strings.ContainsKey(reaction.emotename)) {
-                                                                            strings.Add(reaction.emotename, 0);
-                                                                        }
-                                                                        strings[reaction.emotename]++;
-                                                                    }
-                                                                    if (strings != null) {
-                                                                        //sort by frequency
-                                                                        stringlist = strings.ToList();
-                                                                        stringlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                                        //print
-                                                                        i = 0;
-                                                                        foreach (var item in stringlist) {
-                                                                            i++; if (i > 10) { break; }
-                                                                            t += i + "\t\t" + item.Key + " has been used " + item.Value + " times\n";
-                                                                        }
-                                                                        say += "The top " + i + " most used reacts are:\n" + t;
-                                                                    }
-                                                                    //TOP REACTIONS IN CHANNEL > MOST REACTING USERS
-                                                                    t = "";
-                                                                    ids = new Dictionary<ulong, int>(); //reaction author by frequency
-                                                                    foreach (var reaction in channel.containedReactions) {
-                                                                        if (!ids.ContainsKey(reaction.userId)) {
-                                                                            ids.Add(reaction.userId, 0);
-                                                                        }
-                                                                        ids[reaction.userId]++;
-                                                                    }
-                                                                    if (ids != null) {
-                                                                        //sort by frequency
-                                                                        idlist = ids.ToList();
-                                                                        idlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                                        //print
-                                                                        i = 0;
-                                                                        foreach (var item in idlist) {
-                                                                            i++; if (i > 10) { break; }
-                                                                            t += i + "\t\t" + guild.GetUser(item.Key).Username + " has posted " + item.Value + " reactions\n";
-                                                                        }
-                                                                        say += "\nThe top " + i + " reacting users are:\n" + t;
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    } else {
-                                                        if (inChannel == null) {
-                                                            //TOP REACTIONS BY USER
-                                                            foreach (var user in data.users) {
-                                                                if (user.id == byUser.Id) {
-                                                                    sayChunk = "";
-                                                                    strings = new Dictionary<string, int>(); //emote name by frequency
-                                                                    foreach (var reaction in user.reactions) {
-                                                                        if (!strings.ContainsKey(reaction.emotename)) {
-                                                                            strings.Add(reaction.emotename, 0);
-                                                                        }
-                                                                        strings[reaction.emotename]++;
-                                                                    }
-                                                                    if (strings != null) {
-                                                                        //sort by frequency
-                                                                        stringlist = strings.ToList();
-                                                                        stringlist.Sort((pair1, pair2) => pair1.Value.CompareTo(pair2.Value));
-                                                                        //print
-                                                                        i = 0;
-                                                                        foreach (var item in stringlist) {
-                                                                            i++; if (i > 10) { break; }
-                                                                            sayChunk += i + "\t\t" + item.Key + " has been used " + item.Value + " times\n";
-                                                                        }
-                                                                        say += "Here are " + byUser.Username + "'s " + i + " favourite reactions:\n" + sayChunk;
-                                                                    }
-                                                                }
-                                                            }
-                                                        } else {
-                                                            //TOP REACTIONS BY USER IN CHANNEL
-                                                            foreach (var channel in data.channels) {
-                                                                if (channel.id == inChannel.Id) {
-                                                                    foreach (var user in channel.containedUsers) {
-                                                                        if (user.id == byUser.Id) {
-                                                                            strings = new Dictionary<string, int>();
-                                                                            foreach (var reaction in user.reactions) {
-                                                                                if (!strings.ContainsKey(reaction.emotename)) {
-                                                                                    strings.Add(reaction.emotename, 0);
-                                                                                }
-                                                                                strings[reaction.emotename]++;
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                    break;
-                                                default:
-                                                    say = "Sorry friend, but I don't understand that sequence.";
-                                                    break;
+                                            case "channel":
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
+                                                //Console.WriteLine(message.Author.Mention + " " + statistics.TopChannels(guild, data));
+                                                break;
+                                            case "user":
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
+                                                //Console.WriteLine(message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
+                                                break;
+                                            case "mention":
+                                                await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
+                                                //Console.WriteLine(message.Author.Mention + " " + statistics.TopMentions(guild, data, inChannel, byUser));
+                                                break;
+                                            case "reaction":
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
+                                                //Console.WriteLine(message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
+                                                break;
+                                            default:
+                                                say = "Sorry friend, but I don't understand that sequence.";
+                                                break;
                                             }
-                                            await Say(message.Channel as SocketTextChannel, say);
+                                            //await Say(message.Channel as SocketTextChannel, say);
                                         } else if (command.Find("channels")) {
                                         }
                                     }
@@ -517,6 +305,7 @@ namespace Nonon
                 //return Task.CompletedTask;
             } catch (Exception e){
                 Console.WriteLine(e.Message);
+                await Say(log,e.Message + "\n```"+e.StackTrace+"```");
             }
         }
 
@@ -563,7 +352,293 @@ namespace Nonon
             await user.SendMessageAsync(message);
             //return Task.CompletedTask;
         }
-        
+
+        public class Functions
+        {
+            public Functions() {
+            }
+
+            public string TopChannels(SocketGuild guild, Data data) {
+                Dictionary <ulong, int> channels = new Dictionary<ulong, int>();
+                foreach (var channel in data.channels) {
+                    channels.Add(channel.id, channel.messageCount);
+                }
+                //sort by frequency
+                var channelsList = channels.ToList();
+                channelsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                //print
+                int i = 0; string say = "";
+                foreach (var channel in channelsList) {
+                    i++; if (i > 10) { break; }
+                    say += i + "\t\t" + guild.GetChannel(channel.Key).Name + "\t\twith " + channel.Value + " messages\n";
+                }
+                say = "The top " + i + " most used channels are:\n" + say;
+                return say;
+            }
+
+            public string TopUsers(SocketGuild guild, Data data, SocketTextChannel filterChannel) {
+                //describe stats on users
+                //return dictionary of matching users
+                Dictionary<ulong, int> users = new Dictionary<ulong, int>(); //dictionary is users and message count
+                //get data objects
+                Data.Channel filterDataChannel = null;
+                if (filterChannel != null) {
+                    foreach (var channel in data.channels) {
+                        if (channel.id == filterChannel.Id) {
+                            filterDataChannel = channel;
+                        }
+                    }
+                }
+                if (filterChannel == null) {
+                    //server's users
+                    foreach (var user in data.users) {
+                        users.Add(user.id, user.messagesSent);
+                    }
+                } else {
+                    //channel's users
+                    Console.WriteLine("Channels users");
+                    foreach (var user in filterDataChannel.containedUsers) {
+                        users.Add(user.id, user.messagesSent);
+                    }
+                }
+                //sort by frequency
+                Console.WriteLine("Sort by frequency");
+                var usersList = users.ToList();
+                usersList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                //print
+                Console.WriteLine("print");
+                int i = 0; string say = "";
+                if (usersList.Count != 0) {
+                    if (filterChannel == null) {
+                        foreach (var user in usersList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(user.Key).Username + "\t\thas sent " + user.Value + " messages\n";
+                        }
+                        say = "The top " + i + " most verbose users on " + guild.Name + " are:\n" + say;
+                    } else {
+                        foreach (var user in usersList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(user.Key).Username + "\t\thas sent " + user.Value + " messages\n";
+                        }
+                        say = "The top " + i + " most active denizens of " + filterChannel.Name + " are:\n" + say;
+                    }
+                } else {
+                    say = "sorry, it Looks like no users have spoken there yet!";
+                }
+                return say;
+            }
+            
+            public string TopMentions(SocketGuild guild, Data data,SocketTextChannel filterChannel, SocketUser filterUser) {
+                //describe stats on mentions
+                //return dictionary of matching mentions
+                Console.WriteLine("Getting mentions.");
+                Console.WriteLine("Filter channel is " + (filterChannel == null ? "null" : filterChannel.Id.ToString()));
+                Console.WriteLine("Filter user is " + (filterUser == null ? "null" : filterUser.Id.ToString()));
+                
+                Dictionary<ulong, int> mentions = new Dictionary<ulong, int>(); //dictionary is users mentioned by frequency
+                //get data objects
+                Data.User filterDataUser = null;
+                Data.Channel filterDataChannel = null;
+                if (filterUser != null) {
+                    foreach (var user in data.users) {
+                        if (user.id == filterUser.Id) {
+                            filterDataUser = user;
+                        }
+                    }
+                }
+                if (filterChannel != null) {
+                    foreach (var channel in data.channels) {
+                        if (channel.id == filterChannel.Id) {
+                            filterDataChannel = channel;
+                        }
+                    }
+                }
+                if (filterChannel == null && filterUser == null) {
+                    //server's mentions
+                    foreach (var mention in data.mentions) {
+                        if (!mentions.ContainsKey(mention.mentionedId)) {
+                            mentions.Add(mention.mentionedId, 0);
+                        }
+                        mentions[mention.mentionedId]++;
+                    }
+                } else if (filterChannel == null) {
+                    //user's mentions
+                    foreach (var mention in filterDataUser.mentions) {
+                        if (!mentions.ContainsKey(mention.mentionedId)) {
+                            mentions.Add(mention.mentionedId, 0);
+                        }
+                        mentions[mention.mentionedId]++;
+                    }
+                } else if (filterUser == null) {
+                    //channels's mentions
+                    foreach (var mention in filterDataChannel.containedMentions) {
+                        if (!mentions.ContainsKey(mention.mentionedId)) {
+                            mentions.Add(mention.mentionedId, 0);
+                        }
+                        mentions[mention.mentionedId]++;
+                    }
+                } else {
+                    //filter by both
+                    foreach (var channel in data.channels) {
+                        if (channel.id == filterChannel.Id) {
+                            foreach (var user in channel.containedUsers) {
+                                if (user.id == filterUser.Id) {
+                                    foreach (var mention in user.mentions) {
+                                        if (!mentions.ContainsKey(mention.mentionedId)) {
+                                            mentions.Add(mention.mentionedId, 0);
+                                        }
+                                        mentions[mention.mentionedId]++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                //sort by frequency
+                var mentionsList = mentions.ToList();
+                mentionsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                //print
+                int i = 0; string say = "";
+                if (mentionsList.Count != 0) {
+                    if (filterChannel == null && filterUser == null) {
+                        foreach (var mention in mentionsList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                        }
+                        say = "The top " + i + " most popular users on "+guild.Name+" are:\n" + say;
+                    } else if (filterChannel == null) {
+                        foreach (var mention in mentionsList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                        }
+                        say = filterUser.Username + "'s " + i + " best friends are:\n" + say;
+                    } else if (filterUser == null) {
+                        foreach (var mention in mentionsList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                        }
+                        say = "The top "+ i +" most popular users in " + filterChannel.Name +" are:\n" + say;
+                    } else {
+                        foreach (var mention in mentionsList) {
+                            i++; if (i > 10) { break; }
+                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                        }
+                        say = filterUser.Username + "'s " + i + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
+                    }
+                } else {
+                    say = "sorry, it Looks like no mentions have occurred yet!";
+                }
+                return say;
+            }
+
+            public string TopReactions(SocketGuild guild, Data data, SocketTextChannel filterChannel, SocketUser filterUser) {
+                //describe stats on reactions
+                Console.WriteLine("Getting mentions.");
+                Console.WriteLine("Filter channel is " + (filterChannel == null ? "null" : filterChannel.Id.ToString()));
+                Console.WriteLine("Filter user is " + (filterUser == null ? "null" : filterUser.Id.ToString()));
+
+                Dictionary<string, int> reactions = new Dictionary<string, int>(); //dictionary is reactions by frequency
+                Dictionary<ulong, int> users = new Dictionary<ulong, int>(); //dictionary is users by reaction count
+                //get data objects
+                Data.User filterDataUser = null;
+                Data.Channel filterDataChannel = null;
+                if (filterUser != null) {
+                    foreach (var user in data.users) {
+                        if (user.id == filterUser.Id) {
+                            filterDataUser = user;
+                        }
+                    }
+                }
+                if (filterChannel != null) {
+                    foreach (var channel in data.channels) {
+                        if (channel.id == filterChannel.Id) {
+                            filterDataChannel = channel;
+                        }
+                    }
+                }
+                if (filterChannel == null && filterUser == null) {
+                    //server's reactions
+                    foreach (var reaction in data.reactions) {
+                        if (!reactions.ContainsKey(reaction.emotename)) {
+                            reactions.Add(reaction.emotename, 0);
+                        }
+                        reactions[reaction.emotename]++;
+                    }
+                    foreach (var user in data.users) {
+                        if (!users.ContainsKey(user.id)) {
+                            users.Add(user.id, user.reactions.Count);
+                        }
+                    }
+                } else if (filterChannel == null) {
+                    //user's reactions
+                    foreach (var reaction in filterDataUser.reactions) {
+                        if (!reactions.ContainsKey(reaction.emotename)) {
+                            reactions.Add(reaction.emotename, 0);
+                        }
+                        reactions[reaction.emotename]++;
+                    }
+                } else if (filterUser == null) {
+                    //channels's reactions
+                    foreach (var reaction in filterDataChannel.containedReactions) {
+                        if (!reactions.ContainsKey(reaction.emotename)) {
+                            reactions.Add(reaction.emotename, 0);
+                        }
+                        reactions[reaction.emotename]++;
+                    }
+                } else {
+                    //filter by both
+                    foreach (var channel in data.channels) {
+                        if (channel.id == filterChannel.Id) {
+                            foreach (var user in channel.containedUsers) {
+                                if (user.id == filterUser.Id) {
+                                    foreach (var reaction in user.reactions) {
+                                        if (!reactions.ContainsKey(reaction.emotename)) {
+                                            reactions.Add(reaction.emotename, 0);
+                                        }
+                                        reactions[reaction.emotename]++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                //sort by frequency
+                var reactionsList = reactions.ToList();
+                reactionsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                var usersList = users.ToList();
+                usersList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
+                //print
+                int i = 0; string say = ""; string phrase = "";
+                if (reactionsList.Count != 0) {
+                    foreach (var reaction in reactionsList) {
+                        i++; if (i > 20) { break; }
+                        say += i + "\t\t" + reaction.Key + "\t\tused " + reaction.Value + " times\n";
+                    }
+                    if (filterChannel == null && filterUser == null) {
+                        say = "The top " + i + " most popular reactions on " + guild.Name + " are:\n" + say;
+                        i = 0;
+                        if (usersList.Count != 0) {
+                            foreach (var user in usersList) {
+                                i++; if (i > 10) { break; }
+                                phrase += i + "\t\t" + guild.GetUser(user.Key) + "\t\thas posted " + user.Value + " reactions\n";
+                            }
+                            say += "\n"+ guild.Name +"'s "+i+" biggest reactors are:\n" + phrase;
+                        }
+                    } else if (filterChannel == null) {
+                        say = filterUser.Username + "'s " + i + " favourite reactions are:\n" + say;
+                    } else if (filterUser == null) {
+                        say = "The top " + i + " most popular reactions used in " + filterChannel.Name + " are:\n" + say;
+                    } else {
+                        say = filterUser.Username + "'s " + i + " favourite reactions when chatting in " + filterChannel.Name + " are:\n" + say;
+                    }
+                } else {
+                    say = "Actually, so far, no reactions have been posted.";
+                }
+                return say;
+            }
+
+            
+        }
     }
     class StringEater
     {
@@ -729,6 +804,20 @@ namespace Nonon
                 //serialize object directly into file stream
                 serializer.Serialize(file, data);
             }
+        }
+    }
+    class Personality
+    {
+        string[] greetings;
+
+        public Personality() {
+            greetings = new string[] {"Hallo friends","Good morning all","it me again","hello beautiful people","hi im back again","its me again sorry lol","hi hello hey hi"};
+        }
+
+        public string getGreeting() {
+            Random rnd = new Random();
+            int r = rnd.Next(greetings.Length);
+            return greetings[r];
         }
     }
 }
