@@ -15,6 +15,8 @@ namespace Nonon
         private string token = "";
         private const long targetGuild = 455136595255885844;
         private const long logChannel = 465508556083429376;
+        //private const long targetGuild = 313348275455655936;
+        //private const long logChannel = 376933546624811010;
         DiscordSocketClient client;
         SocketGuild guild;
         SocketTextChannel log;
@@ -55,14 +57,12 @@ namespace Nonon
                 //we're connected and ready to join a guild
                 guild = client.GetGuild(targetGuild);
                 await client.SetStatusAsync(UserStatus.Online);
-                await client.SetGameAsync("Heckin wowee my buds");
+                await client.SetGameAsync(DateTime.Now.ToString("g"));
 
                 //get log channel
                 Console.WriteLine("Connected on " + guild.Name);
                 log = guild.GetTextChannel(logChannel);
                 Console.WriteLine("Log channel name is " +log.Name);
-                var time = DateTime.Now;
-                await Say(log as SocketTextChannel, "New launch "+ time.ToString("g")+" >> "+me.getGreeting());
                 //return Task.CompletedTask;
             };
             // Block this task until the program is closed.
@@ -75,9 +75,9 @@ namespace Nonon
             return Task.CompletedTask;
         }
 
-        private async Task MessageReceived(SocketMessage message)
+        private Task MessageReceived(SocketMessage message)
         {
-            try {
+            //try {
                 if (client != null && guild != null) {
                     if (message.Author.Id != client.CurrentUser.Id) {
                         //message came from the outside
@@ -115,7 +115,7 @@ namespace Nonon
                                         guser = guild.GetUser(user.id);
                                         mentioned = false;
                                         if (suser != null && suser.Username.ToLower() == word.ToLower()) { mentioned = true; }
-                                        if (guser != null && guser.Nickname.ToLower() == word.ToLower()) { mentioned = true; }
+                                        if (guser != null && bestName(guser).ToLower() == word.ToLower()) { mentioned = true; }
                                         if (mentioned) {
                                             data.AddMention(suser);
                                             dataUser.AddMention(suser);
@@ -134,8 +134,8 @@ namespace Nonon
                                         StringEater command = new StringEater(message.Content.ToLower());
                                         command.Get(); //remove the mention
                                         if (command.Find("help")) {
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
+                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
+                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
                                             string s = "Here are my commands.\n" +
                                                 "They work in a logical way. Ask for an item to see the counts of that item on the server.\n" +
                                                 "Item can be users, channels, reacts, or mentions.\n" +
@@ -150,7 +150,7 @@ namespace Nonon
                                                 "~~channel <channelname>\t\tShows the stats for this channel.~~\n" +
                                                 "~~server\t\tShows the stats for the server.~~\n" +
                                                 "~~friendships\t\tShows the biggest friendships on the server.~~\n";
-                                            await DirectSay(message.Author, s);
+                                            //await DirectSay(message.Author, s);
                                         } else if (command.Find("me")) {
                                             Data.User me = null;
                                             string say = ""; string phrase = "";  int i = 0;
@@ -224,7 +224,7 @@ namespace Nonon
                                             if (me == null) {
                                                 say = "Sorry, I don't have any information about you.";
                                             }
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
+                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
                                         } else if (command.Find("top")) {
                                             string selectedItem = null;
                                             string query = null;
@@ -265,19 +265,19 @@ namespace Nonon
                                             }
                                             switch (selectedItem) {
                                             case "channel":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
+                                                //await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 break;
                                             case "user":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
+                                                Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 break;
                                             case "mention":
-                                                await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
+                                                //await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopMentions(guild, data, inChannel, byUser));
                                                 break;
                                             case "reaction":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
+                                                //await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 break;
                                             default:
@@ -302,11 +302,11 @@ namespace Nonon
                     Console.WriteLine("client was null");
                 }
                 //await message.Channel.SendMessageAsync(message.Content);
-                //return Task.CompletedTask;
-            } catch (Exception e){
-                Console.WriteLine(e.Message);
-                await Say(log,e.Message + "\n```"+e.StackTrace+"```");
-            }
+                return Task.CompletedTask;
+            //} catch (Exception e){
+                //Console.WriteLine(e.Message);
+                //await Say(log,e.Message + "\n```"+e.StackTrace+"```");
+            //}
         }
 
         private Task ReactionAdded(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction) {
@@ -353,6 +353,13 @@ namespace Nonon
             //return Task.CompletedTask;
         }
 
+        static string bestName(SocketGuildUser user) {
+            return user.Nickname == null ? user.Username : user.Nickname;
+        }
+        static string bestName(SocketUser user) {
+            return (user as SocketGuildUser).Nickname == null ? user.Username : (user as SocketGuildUser).Nickname;
+        }
+
         public class Functions
         {
             public Functions() {
@@ -396,29 +403,32 @@ namespace Nonon
                     }
                 } else {
                     //channel's users
-                    Console.WriteLine("Channels users");
                     foreach (var user in filterDataChannel.containedUsers) {
                         users.Add(user.id, user.messagesSent);
                     }
                 }
                 //sort by frequency
-                Console.WriteLine("Sort by frequency");
                 var usersList = users.ToList();
                 usersList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
                 //print
-                Console.WriteLine("print");
                 int i = 0; string say = "";
                 if (usersList.Count != 0) {
                     if (filterChannel == null) {
                         foreach (var user in usersList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(user.Key).Username + "\t\thas sent " + user.Value + " messages\n";
+                            SocketGuildUser guser = guild.GetUser(user.Key);
+                            if (guser != null) {
+                                i++; if (i > 10) { break; }
+                                say += i + "\t\t" + bestName(guser) + "\t\thas sent " + user.Value + " messages\n";
+                            }
                         }
                         say = "The top " + i + " most verbose users on " + guild.Name + " are:\n" + say;
                     } else {
                         foreach (var user in usersList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(user.Key).Username + "\t\thas sent " + user.Value + " messages\n";
+                            SocketGuildUser guser = guild.GetUser(user.Key);
+                            if (guser != null) {
+                                i++; if (i > 10) { break; }
+                                say += i + "\t\t" + bestName(guild.GetUser(user.Key)) + "\t\thas sent " + user.Value + " messages\n";
+                            }
                         }
                         say = "The top " + i + " most active denizens of " + filterChannel.Name + " are:\n" + say;
                     }
@@ -502,28 +512,28 @@ namespace Nonon
                 if (mentionsList.Count != 0) {
                     if (filterChannel == null && filterUser == null) {
                         foreach (var mention in mentionsList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                            if (i > 10) { break; } i++;
+                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
                         say = "The top " + i + " most popular users on "+guild.Name+" are:\n" + say;
                     } else if (filterChannel == null) {
                         foreach (var mention in mentionsList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                            if (i > 10) { break; } i++;
+                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = filterUser.Username + "'s " + i + " best friends are:\n" + say;
+                        say = bestName(filterUser) + "'s " + i + " best friends are:\n" + say;
                     } else if (filterUser == null) {
                         foreach (var mention in mentionsList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                            if (i > 10) { break; } i++;
+                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
                         say = "The top "+ i +" most popular users in " + filterChannel.Name +" are:\n" + say;
                     } else {
                         foreach (var mention in mentionsList) {
-                            i++; if (i > 10) { break; }
-                            say += i + "\t\t" + guild.GetUser(mention.Key).Username + "\t\tmentioned " + mention.Value + " times\n";
+                            if (i > 10) { break; } i++;
+                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = filterUser.Username + "'s " + i + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
+                        say = bestName(filterUser) + "'s " + i + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
                     }
                 } else {
                     say = "sorry, it Looks like no mentions have occurred yet!";
@@ -625,11 +635,11 @@ namespace Nonon
                             say += "\n"+ guild.Name +"'s "+i+" biggest reactors are:\n" + phrase;
                         }
                     } else if (filterChannel == null) {
-                        say = filterUser.Username + "'s " + i + " favourite reactions are:\n" + say;
+                        say = bestName(filterUser) + "'s " + i + " favourite reactions are:\n" + say;
                     } else if (filterUser == null) {
                         say = "The top " + i + " most popular reactions used in " + filterChannel.Name + " are:\n" + say;
                     } else {
-                        say = filterUser.Username + "'s " + i + " favourite reactions when chatting in " + filterChannel.Name + " are:\n" + say;
+                        say = bestName(filterUser) + "'s " + i + " favourite reactions when chatting in " + filterChannel.Name + " are:\n" + say;
                     }
                 } else {
                     say = "Actually, so far, no reactions have been posted.";
@@ -820,4 +830,7 @@ namespace Nonon
             return greetings[r];
         }
     }
+
+
+    
 }
