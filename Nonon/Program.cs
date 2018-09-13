@@ -54,7 +54,6 @@ namespace Nonon
 
             //do connection
             await client.LoginAsync(TokenType.Bot, token);
-            await rest.LoginAsync(TokenType.Bot, token);
             await client.StartAsync();
 
             //assign events
@@ -74,7 +73,7 @@ namespace Nonon
 
                 if (scanHistory) {
                     try { 
-                        await ScanServer(client,rest,guild);
+                        await ScanServer(client,guild);
                     } catch (Exception e) {
                         Console.WriteLine(e.Message + "\n\n" + e.StackTrace + "\n\n\n");
                     }
@@ -96,7 +95,7 @@ namespace Nonon
             return Task.CompletedTask;
         }
 
-        private async Task ScanServer(DiscordSocketClient client, DiscordRestClient rest, SocketGuild guild) {
+        private async Task ScanServer(DiscordSocketClient client, SocketGuild guild) {
             bool verbose = false;
             ulong total = 0;
             Console.WriteLine("Performing server history scan");
@@ -186,7 +185,7 @@ namespace Nonon
                                             foreach (var user in data.users) {
                                                 if (user.id == message.Author.Id) {
                                                     me = user;
-                                                    say = "Here are your stats:\n";
+                                                    say = " Here are your stats:\n";
                                                     say += "You've sent " + user.messagesSent + " messages during your time here.\n";
                                                     say += "You've also posted " + user.reactions.Count + " reactions.\n";
                                                     //find busiest channel
@@ -202,7 +201,7 @@ namespace Nonon
                                                     }
                                                     if (bc != null) {
                                                         var channel = guild.GetChannel(bc.id);
-                                                        float percent = bc.messageCount / bcm * 100;
+                                                        float percent = (bc.messageCount / bcm) * 100;
                                                         say += "Your busiest channel is " + channel.Name + ", and you have sent " + bcm + " messages there.\n" +
                                                             "That's " + percent + "% of that channel's discussion.\n";
                                                     }
@@ -224,7 +223,7 @@ namespace Nonon
                                                                 i++; if (i > 20) { break; }
                                                                 phrase += i + "\t\t" + reaction.Key + "\t\tused " + reaction.Value + " times\n";
                                                             }
-                                                        say += "\nYour top " + i + " favourite reactions are:\n" + phrase;
+                                                        say += "\nYour top " + (i - 1) + " favourite reactions are:\n" + phrase;
                                                         }
                                                     }
                                                     //find favourite mention
@@ -242,10 +241,13 @@ namespace Nonon
                                                         mentionsList.Sort((pair1, pair2) => pair2.Value.CompareTo(pair1.Value));
                                                         if (mentionsList.Count != 0) {
                                                             foreach (var mention in mentionsList) {
-                                                                i++; if (i > 20) { break; }
-                                                                phrase += i + "\t\t" + mention.Key + "\t\tmentioned " + mention.Value + " times\n";
+                                                                var guser = guild.GetUser(mention.Key);
+                                                                if (guser != null) {
+                                                                    i++; if (i > 10) { break; }
+                                                                    phrase += i + "\t\t" + bestName(guser) + "\t\tmentioned " + mention.Value + " times\n";
+                                                                }
                                                             }
-                                                            say += "\nYour " + i + " best friends are:\n" + phrase;
+                                                            say += "\nYour " + (i-1) + " best friends are:\n" + phrase;
                                                         }
                                                     }
                                                 }
@@ -430,8 +432,8 @@ namespace Nonon
                     }
                 }
             }
-
-            //check for reactions
+            
+            //todo: check for reactions
         }
 
         private void ParseMessage(SocketGuildChannel guildChannel, SocketMessage message) {
@@ -495,7 +497,7 @@ namespace Nonon
                     i++; if (i > 10) { break; }
                     say += i + "\t\t" + guild.GetChannel(channel.Key).Name + "\t\twith " + channel.Value + " messages\n";
                 }
-                say = "The top " + i + " most used channels are:\n" + say;
+                say = "The top " + (i - 1) + " most used channels are:\n" + say;
                 return say;
             }
 
@@ -537,7 +539,7 @@ namespace Nonon
                                 say += i + "\t\t" + bestName(guser) + "\t\thas sent " + user.Value + " messages\n";
                             }
                         }
-                        say = "The top " + i + " most verbose users on " + guild.Name + " are:\n" + say;
+                        say = "The top " + (i - 1) + " most verbose users on " + guild.Name + " are:\n" + say;
                     } else {
                         foreach (var user in usersList) {
                             SocketGuildUser guser = guild.GetUser(user.Key);
@@ -546,7 +548,7 @@ namespace Nonon
                                 say += i + "\t\t" + bestName(guild.GetUser(user.Key)) + "\t\thas sent " + user.Value + " messages\n";
                             }
                         }
-                        say = "The top " + i + " most active denizens of " + filterChannel.Name + " are:\n" + say;
+                        say = "The top " + (i - 1) + " most active denizens of " + filterChannel.Name + " are:\n" + say;
                     }
                 } else {
                     say = "sorry, it Looks like no users have spoken there yet!";
@@ -631,25 +633,25 @@ namespace Nonon
                             if (i > 10) { break; } i++;
                             say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = "The top " + i + " most popular users on "+guild.Name+" are:\n" + say;
+                        say = "The top " + (i - 1) + " most popular users on "+guild.Name+" are:\n" + say;
                     } else if (filterChannel == null) {
                         foreach (var mention in mentionsList) {
                             if (i > 10) { break; } i++;
                             say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = bestName(filterUser) + "'s " + i + " best friends are:\n" + say;
+                        say = bestName(filterUser) + "'s " + (i - 1) + " best friends are:\n" + say;
                     } else if (filterUser == null) {
                         foreach (var mention in mentionsList) {
                             if (i > 10) { break; } i++;
                             say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = "The top "+ i +" most popular users in " + filterChannel.Name +" are:\n" + say;
+                        say = "The top "+ (i - 1) + " most popular users in " + filterChannel.Name +" are:\n" + say;
                     } else {
                         foreach (var mention in mentionsList) {
                             if (i > 10) { break; } i++;
                             say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
                         }
-                        say = bestName(filterUser) + "'s " + i + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
+                        say = bestName(filterUser) + "'s " + (i - 1) + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
                     }
                 } else {
                     say = "sorry, it Looks like no mentions have occurred yet!";
@@ -741,7 +743,7 @@ namespace Nonon
                         say += i + "\t\t" + reaction.Key + "\t\tused " + reaction.Value + " times\n";
                     }
                     if (filterChannel == null && filterUser == null) {
-                        say = "The top " + i + " most popular reactions on " + guild.Name + " are:\n" + say;
+                        say = "The top " + (i - 1) + " most popular reactions on " + guild.Name + " are:\n" + say;
                         i = 0;
                         if (usersList.Count != 0) {
                             foreach (var user in usersList) {
@@ -751,11 +753,11 @@ namespace Nonon
                             say += "\n"+ guild.Name +"'s "+i+" biggest reactors are:\n" + phrase;
                         }
                     } else if (filterChannel == null) {
-                        say = bestName(filterUser) + "'s " + i + " favourite reactions are:\n" + say;
+                        say = bestName(filterUser) + "'s " + (i - 1) + " favourite reactions are:\n" + say;
                     } else if (filterUser == null) {
-                        say = "The top " + i + " most popular reactions used in " + filterChannel.Name + " are:\n" + say;
+                        say = "The top " + (i - 1) + " most popular reactions used in " + filterChannel.Name + " are:\n" + say;
                     } else {
-                        say = bestName(filterUser) + "'s " + i + " favourite reactions when chatting in " + filterChannel.Name + " are:\n" + say;
+                        say = bestName(filterUser) + "'s " + (i - 1) + " favourite reactions when chatting in " + filterChannel.Name + " are:\n" + say;
                     }
                 } else {
                     say = "Actually, so far, no reactions have been posted.";
