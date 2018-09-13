@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
+using Discord.Rest;
 using Newtonsoft.Json;
 
 namespace Nonon
@@ -21,9 +22,11 @@ namespace Nonon
         //private const long logChannel = 376933546624811010;
         //private const string dataPath = @"C:\nonon\testData.json";
         DiscordSocketClient client;
+        DiscordRestClient rest;
         SocketGuild guild;
         SocketTextChannel log;
         Data data;
+        bool scanHistory = false;
         Storer storer = new Storer(dataPath);
         Personality me = new Personality();
         Functions statistics = new Functions();
@@ -34,6 +37,7 @@ namespace Nonon
         public async Task MainAsync()
         {
             client = new DiscordSocketClient();
+            rest = new DiscordRestClient();
             //load bot token.
             if (File.Exists(tokenPath)) {
                 token = File.ReadAllText(tokenPath);
@@ -44,17 +48,18 @@ namespace Nonon
                 Console.WriteLine("Loaded data from file.");
             } else {
                 data = new Data();
+                scanHistory = true;
                 Console.WriteLine("Created new data file.");
             }           
 
             //do connection
             await client.LoginAsync(TokenType.Bot, token);
+            await rest.LoginAsync(TokenType.Bot, token);
             await client.StartAsync();
 
             //assign events
             client.Log += Log;
-            client.MessageReceived += MessageReceived;
-            client.ReactionAdded += ReactionAdded;
+            
             client.Ready += async () =>
             {
                 //we're connected and ready to join a guild
@@ -66,8 +71,21 @@ namespace Nonon
                 Console.WriteLine("Connected on " + guild.Name);
                 log = guild.GetTextChannel(logChannel);
                 Console.WriteLine("Log channel name is " +log.Name);
+
+                if (scanHistory) {
+                    try { 
+                        await ScanServer(client,rest,guild);
+                    } catch (Exception e) {
+                        Console.WriteLine(e.Message + "\n\n" + e.StackTrace + "\n\n\n");
+                    }
+                }
+                //assign message events
+                client.MessageReceived += MessageReceived;
+                client.ReactionAdded += ReactionAdded;
+
                 //return Task.CompletedTask;
             };
+
             // Block this task until the program is closed.
             await Task.Delay(-1);
         }
@@ -76,6 +94,51 @@ namespace Nonon
         {
             Console.WriteLine(msg.ToString());
             return Task.CompletedTask;
+        }
+
+        private async Task ScanServer(DiscordSocketClient client, DiscordRestClient rest, SocketGuild guild) {
+            bool verbose = false;
+            ulong total = 0;
+            Console.WriteLine("Performing server history scan");
+            await client.SetGameAsync("Tallying message history...");
+            if (verbose) { await Say(log, "I'm scanning the message history! I'm heckin verbose about it today too"); }
+            var channels = guild.TextChannels;
+            Console.WriteLine("Found " + channels.Count + " channels");
+            foreach (var channel in channels) {
+                await client.SetGameAsync("Tallying message history in #" + channel.Name);
+                Console.WriteLine("Tallying message history in #" + channel.Name + "... (" + total + " messages seen so far)");
+                if (verbose) { await Say(log, "Tallying message history in #" + channel.Name + "... (" + total + " messages seen so far)"); }
+                var messages = await channel.GetMessagesAsync(1).Flatten();
+                var startMessage = messages.FirstOrDefault();
+                Console.WriteLine("Start message is " + startMessage.Id);
+                if (startMessage != null) {
+                    try {
+                        messages = await channel.GetMessagesAsync(startMessage.Id, Direction.Before, 100).Flatten();
+                        while (messages.Count() != 0) {
+                            foreach (var message in messages) {
+                                //Console.WriteLine("Downloaded message: " + message.Channel.Name + " >> " + message.Content + " @ " + message.CreatedAt.ToString("g"));
+                                total++;
+                                try {
+                                    ParsePastMessage(channel as SocketGuildChannel, message);
+                                } catch(Exception e) {
+                                    Console.WriteLine(e.Message + "\n\n" + e.StackTrace + "\n\n\n");
+                                    Console.WriteLine(message.Id);
+                                }
+                            }
+                            try {
+                                messages = await channel.GetMessagesAsync(messages.LastOrDefault(), Direction.Before, 100).Flatten();
+                            } catch (Exception e) {
+                                Console.WriteLine(e.Message + "\n\n" + e.StackTrace + "\n\n\n");
+                            }
+                        }
+                    } catch (Exception e) {
+                        Console.WriteLine(e.Message + "\n\n" + e.StackTrace + "\n\n\n");
+                    }
+                }
+            }
+            //save stats
+            storer.save(data);
+            //return Task.CompletedTask;
         }
 
         private Task MessageReceived(SocketMessage message)
@@ -88,49 +151,12 @@ namespace Nonon
                         SocketTextChannel textChannel = message.Channel as SocketTextChannel;
                         if (guildChannel != null) {
                             if (guildChannel.Guild.Id == guild.Id) {
-                                string[] messageWords = message.Content.Split(null);
-                                //record stats ------------------------------------------------------------------------------------
                                 Console.WriteLine(message.Author.Username + " @ " + guildChannel.Guild + " >> " + message.Content);
-                                //update stats on the user
-                                Data.User dataUser = data.FindUser(message.Author);
-                                dataUser.messagesSent += 1;
-                                //Console.WriteLine("User " + dataUser.id + " has sent " + dataUser.messagesSent + " messages.");
-                                //update stats on the channel
-                                Data.Channel dataChannel = data.FindChannel(message.Channel);
-                                dataChannel.messageCount += 1;
-                                Data.User dataChannelUser = dataChannel.FindUser(message.Author);
-                                dataChannelUser.messagesSent += 1;
-                                //Console.WriteLine("User " + dataChannelUser.id + " has sent " + dataChannelUser.messagesSent + " messages on this channel.");
-                                //check for mentions
-                                foreach (SocketUser mentionedUser in message.MentionedUsers) {
-                                    data.AddMention(mentionedUser);
-                                    dataUser.AddMention(mentionedUser);
-                                    dataChannel.AddMention(mentionedUser);
-                                    dataChannelUser.AddMention(mentionedUser);
-                                }
-                                //check for parsed mentions
-                                SocketUser suser;
-                                SocketGuildUser guser;
-                                bool mentioned;
-                                foreach (string word in messageWords) {
-                                    foreach (Data.User user in data.users) {
-                                        suser = client.GetUser(user.id);
-                                        guser = guild.GetUser(user.id);
-                                        mentioned = false;
-                                        if (suser != null && suser.Username.ToLower() == word.ToLower()) { mentioned = true; }
-                                        if (guser != null && bestName(guser).ToLower() == word.ToLower()) { mentioned = true; }
-                                        if (mentioned) {
-                                            data.AddMention(suser);
-                                            dataUser.AddMention(suser);
-                                            dataChannel.AddMention(suser);
-                                            dataChannelUser.AddMention(suser);
-                                        }
-                                    }
-                                }
+                                ParseMessage(guildChannel, message);
                                 //save stats
                                 storer.save(data);
-                                //Check for commands ----------------------------------------------------------------
-                                foreach (SocketUser mentionedUser in message.MentionedUsers) {
+                            //Check for commands ----------------------------------------------------------------
+                            foreach (SocketUser mentionedUser in message.MentionedUsers) {
                                     if (mentionedUser.Id == client.CurrentUser.Id) {
                                         //this is a command
                                         Console.WriteLine("$$ " + message.Content);
@@ -361,6 +387,93 @@ namespace Nonon
         }
         static string bestName(SocketUser user) {
             return (user as SocketGuildUser).Nickname == null ? user.Username : (user as SocketGuildUser).Nickname;
+        }
+
+        private void ParsePastMessage(SocketGuildChannel guildChannel, IMessage message) {
+            string[] messageWords = message.Content.Split(null);
+            //record stats ------------------------------------------------------------------------------------
+            //update stats on the user
+            Data.User dataUser = data.FindUser(message.Author);
+            dataUser.messagesSent += 1;
+            //Console.WriteLine("User " + dataUser.id + " has sent " + dataUser.messagesSent + " messages.");
+            //update stats on the channel
+            Data.Channel dataChannel = data.FindChannel(message.Channel);
+            dataChannel.messageCount += 1;
+            Data.User dataChannelUser = dataChannel.FindUser(message.Author);
+            dataChannelUser.messagesSent += 1;
+            //Console.WriteLine("User " + dataChannelUser.id + " has sent " + dataChannelUser.messagesSent + " messages on this channel.");
+            //check for mentions
+            foreach (var mentionedUser in message.MentionedUserIds) {
+                var socketGuildUserFromId = guildChannel.GetUser(mentionedUser);
+                data.AddMention(socketGuildUserFromId);
+                dataUser.AddMention(socketGuildUserFromId);
+                dataChannel.AddMention(socketGuildUserFromId);
+                dataChannelUser.AddMention(socketGuildUserFromId);
+            }
+
+            //check for parsed mentions
+            SocketUser suser;
+            SocketGuildUser guser;
+            bool mentioned;
+            foreach (string word in messageWords) {
+                foreach (Data.User user in data.users) {
+                    suser = client.GetUser(user.id);
+                    guser = guild.GetUser(user.id);
+                    mentioned = false;
+                    if (suser != null && suser.Username.ToLower() == word.ToLower()) { mentioned = true; }
+                    if (guser != null && bestName(guser).ToLower() == word.ToLower()) { mentioned = true; }
+                    if (mentioned) {
+                        data.AddMention(suser);
+                        dataUser.AddMention(suser);
+                        dataChannel.AddMention(suser);
+                        dataChannelUser.AddMention(suser);
+                    }
+                }
+            }
+
+            //check for reactions
+        }
+
+        private void ParseMessage(SocketGuildChannel guildChannel, SocketMessage message) {
+            string[] messageWords = message.Content.Split(null);
+            //record stats ------------------------------------------------------------------------------------
+            //update stats on the user
+            Data.User dataUser = data.FindUser(message.Author);
+            dataUser.messagesSent += 1;
+            //Console.WriteLine("User " + dataUser.id + " has sent " + dataUser.messagesSent + " messages.");
+            //update stats on the channel
+            Data.Channel dataChannel = data.FindChannel(message.Channel);
+            dataChannel.messageCount += 1;
+            Data.User dataChannelUser = dataChannel.FindUser(message.Author);
+            dataChannelUser.messagesSent += 1;
+            //Console.WriteLine("User " + dataChannelUser.id + " has sent " + dataChannelUser.messagesSent + " messages on this channel.");
+            //check for mentions
+            foreach (SocketUser mentionedUser in message.MentionedUsers) {
+                data.AddMention(mentionedUser);
+                dataUser.AddMention(mentionedUser);
+                dataChannel.AddMention(mentionedUser);
+                dataChannelUser.AddMention(mentionedUser);
+            }
+
+            //check for parsed mentions
+            SocketUser suser;
+            SocketGuildUser guser;
+            bool mentioned;
+            foreach (string word in messageWords) {
+                foreach (Data.User user in data.users) {
+                    suser = client.GetUser(user.id);
+                    guser = guild.GetUser(user.id);
+                    mentioned = false;
+                    if (suser != null && suser.Username.ToLower() == word.ToLower()) { mentioned = true; }
+                    if (guser != null && bestName(guser).ToLower() == word.ToLower()) { mentioned = true; }
+                    if (mentioned) {
+                        data.AddMention(suser);
+                        dataUser.AddMention(suser);
+                        dataChannel.AddMention(suser);
+                        dataChannelUser.AddMention(suser);
+                    }
+                }
+            }
         }
 
         public class Functions
@@ -693,6 +806,7 @@ namespace Nonon
         public List<Channel> channels;
         public List<Mention> mentions;
         public List<Reaction> reactions;
+        public bool populated = false;
 
         public Data() {
             users = new List<User>();
@@ -700,7 +814,8 @@ namespace Nonon
             mentions = new List<Mention>();
             reactions = new List<Reaction>();
         }
-        public User FindUser(SocketUser source) {
+
+        public User FindUser(IUser source) {
             var user = users.Where(item => item.id == source.Id).FirstOrDefault();
             if (user == null) {
                 //we didnt find one. so let's make and add one.
@@ -709,7 +824,7 @@ namespace Nonon
             }
             return user;
         }
-        public Channel FindChannel (ISocketMessageChannel source) {
+        public Channel FindChannel (IMessageChannel source) {
             var channel = channels.Where(item => item.id == source.Id).FirstOrDefault();
             if (channel == null) {
                 //we didnt find one. so let's make and add one.
@@ -732,7 +847,7 @@ namespace Nonon
             public int messagesSent;
 
             public User() {}
-            public User(SocketUser user) {
+            public User(IUser user) {
                 id = user.Id;
                 messagesSent = 0;
                 mentions = new List<Mention>();
@@ -753,14 +868,14 @@ namespace Nonon
             public List<Reaction> containedReactions;
             public int messageCount;
             public Channel() {}
-            public Channel(ISocketMessageChannel channel) {
+            public Channel(IMessageChannel channel) {
                 id = channel.Id;
                 containedUsers = new List<User>();
                 containedMentions = new List<Mention>();
                 containedReactions = new List<Reaction>();
                 messageCount = 0;
             }
-            public User FindUser(SocketUser source) {
+            public User FindUser(IUser source) {
                 //try to find a contained user or add one if we didn't find one
                 var user = containedUsers.Where(item => item.id == source.Id).FirstOrDefault();
                 if (user == null) {
@@ -770,7 +885,7 @@ namespace Nonon
                 }
                 return user;
             }
-            public void AddMention(SocketUser mentionedUser) {
+            public void AddMention(IUser mentionedUser) {
                 containedMentions.Add(new Mention(mentionedUser));
             }
             public void AddReaction(SocketReaction reaction) {
@@ -781,9 +896,10 @@ namespace Nonon
         {
             public ulong mentionedId;
             public Mention(){}
-            public Mention(SocketUser mentionedUser) {
-                //Console.WriteLine("Recorded new mention of " + mentionedUser.Username);
-                mentionedId = mentionedUser.Id;
+            public Mention(IUser mentionedUser) {
+                if (mentionedUser != null) {
+                    mentionedId = mentionedUser.Id;
+                }
             }
         }
         public class Reaction : DataObject
