@@ -13,15 +13,18 @@ namespace Nonon
     class Program
     {
         private string token = "";
-        private const long targetGuild = 455136595255885844;
+        private const string tokenPath = @"C:\nonon\token.txt";
+        private const long targetGuild = 455136595255885844; //deployed on chlo's server
         private const long logChannel = 465508556083429376;
-        //private const long targetGuild = 313348275455655936;
+        private const string dataPath = @"C:\nonon\data.json";
+        //private const long targetGuild = 313348275455655936; //deployed on my server
         //private const long logChannel = 376933546624811010;
+        //private const string dataPath = @"C:\nonon\testData.json";
         DiscordSocketClient client;
         SocketGuild guild;
         SocketTextChannel log;
         Data data;
-        Storer storer = new Storer();
+        Storer storer = new Storer(dataPath);
         Personality me = new Personality();
         Functions statistics = new Functions();
 
@@ -32,11 +35,11 @@ namespace Nonon
         {
             client = new DiscordSocketClient();
             //load bot token.
-            if (File.Exists(@"c:\nonon\token.txt")) {
-                token = File.ReadAllText(@"C:\nonon\token.txt");
+            if (File.Exists(tokenPath)) {
+                token = File.ReadAllText(tokenPath);
             }
-                //load or generate data
-                if (File.Exists(@"c:\nonon\data.json")) {
+            //load or generate data
+            if (File.Exists(dataPath)) {
                 data = storer.load();
                 Console.WriteLine("Loaded data from file.");
             } else {
@@ -75,9 +78,9 @@ namespace Nonon
             return Task.CompletedTask;
         }
 
-        private Task MessageReceived(SocketMessage message)
+        private async Task MessageReceived(SocketMessage message)
         {
-            //try {
+            try {
                 if (client != null && guild != null) {
                     if (message.Author.Id != client.CurrentUser.Id) {
                         //message came from the outside
@@ -134,8 +137,8 @@ namespace Nonon
                                         StringEater command = new StringEater(message.Content.ToLower());
                                         command.Get(); //remove the mention
                                         if (command.Find("help")) {
-                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
-                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
+                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
+                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
                                             string s = "Here are my commands.\n" +
                                                 "They work in a logical way. Ask for an item to see the counts of that item on the server.\n" +
                                                 "Item can be users, channels, reacts, or mentions.\n" +
@@ -150,7 +153,7 @@ namespace Nonon
                                                 "~~channel <channelname>\t\tShows the stats for this channel.~~\n" +
                                                 "~~server\t\tShows the stats for the server.~~\n" +
                                                 "~~friendships\t\tShows the biggest friendships on the server.~~\n";
-                                            //await DirectSay(message.Author, s);
+                                            await DirectSay(message.Author, s);
                                         } else if (command.Find("me")) {
                                             Data.User me = null;
                                             string say = ""; string phrase = "";  int i = 0;
@@ -224,7 +227,7 @@ namespace Nonon
                                             if (me == null) {
                                                 say = "Sorry, I don't have any information about you.";
                                             }
-                                            //await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
+                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
                                         } else if (command.Find("top")) {
                                             string selectedItem = null;
                                             string query = null;
@@ -265,19 +268,19 @@ namespace Nonon
                                             }
                                             switch (selectedItem) {
                                             case "channel":
-                                                //await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 break;
                                             case "user":
-                                                Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 break;
                                             case "mention":
-                                                //await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
+                                                await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopMentions(guild, data, inChannel, byUser));
                                                 break;
                                             case "reaction":
-                                                //await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
+                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 break;
                                             default:
@@ -302,11 +305,11 @@ namespace Nonon
                     Console.WriteLine("client was null");
                 }
                 //await message.Channel.SendMessageAsync(message.Content);
-                return Task.CompletedTask;
-            //} catch (Exception e){
-                //Console.WriteLine(e.Message);
+                //return Task.CompletedTask;
+            } catch (Exception e){
+                Console.WriteLine(e.Message);
                 //await Say(log,e.Message + "\n```"+e.StackTrace+"```");
-            //}
+            }
         }
 
         private Task ReactionAdded(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction) {
@@ -802,14 +805,18 @@ namespace Nonon
     }
     class Storer
     {
+        string dataPath;
+        public Storer(string dataPath) {
+            this.dataPath = dataPath;
+        }
         public Data load() {
-            string text = File.ReadAllText(@"C:\nonon\data.json");
+            string text = File.ReadAllText(dataPath);
             Data data = JsonConvert.DeserializeObject<Data>(text);
             return data;
         }
         public void save(Data data) {
             //open file stream
-            using (StreamWriter file = File.CreateText(@"C:\nonon\data.json")) {
+            using (StreamWriter file = File.CreateText(dataPath)) {
                 JsonSerializer serializer = new JsonSerializer();
                 //serialize object directly into file stream
                 serializer.Serialize(file, data);
