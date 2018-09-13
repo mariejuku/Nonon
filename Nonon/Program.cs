@@ -193,15 +193,17 @@ namespace Nonon
                                                     int bcm = 0;
                                                     foreach (var channel in data.channels) {
                                                         foreach (var containedUser in channel.containedUsers) {
-                                                            if (containedUser.messagesSent > bcm) {
-                                                                bcm = containedUser.messagesSent;
-                                                                bc = channel;
+                                                            if (containedUser.id == message.Author.Id) {
+                                                                if (containedUser.messagesSent > bcm) {
+                                                                    bcm = containedUser.messagesSent;
+                                                                    bc = channel;
+                                                                }
                                                             }
                                                         }
                                                     }
                                                     if (bc != null) {
                                                         var channel = guild.GetChannel(bc.id);
-                                                        float percent = (bc.messageCount / bcm) * 100;
+                                                        float percent = (bc.messageCount / bcm);
                                                         say += "Your busiest channel is " + channel.Name + ", and you have sent " + bcm + " messages there.\n" +
                                                             "That's " + percent + "% of that channel's discussion.\n";
                                                     }
@@ -630,26 +632,42 @@ namespace Nonon
                 if (mentionsList.Count != 0) {
                     if (filterChannel == null && filterUser == null) {
                         foreach (var mention in mentionsList) {
-                            if (i > 10) { break; } i++;
-                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
+                            var guser = guild.GetUser(mention.Key);
+                            if (guser != null) {
+                                if (i > 10) { break; }
+                                i++;
+                                say += i + "\t\t" + bestName(guser) + "\t\tmentioned " + mention.Value + " times\n";
+                            }
                         }
                         say = "The top " + (i - 1) + " most popular users on "+guild.Name+" are:\n" + say;
                     } else if (filterChannel == null) {
                         foreach (var mention in mentionsList) {
-                            if (i > 10) { break; } i++;
-                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
+                            var guser = guild.GetUser(mention.Key);
+                            if (guser != null) {
+                                if (i > 10) { break; }
+                                i++;
+                                say += i + "\t\t" + bestName(guser) + "\t\tmentioned " + mention.Value + " times\n";
+                            }
                         }
                         say = bestName(filterUser) + "'s " + (i - 1) + " best friends are:\n" + say;
                     } else if (filterUser == null) {
                         foreach (var mention in mentionsList) {
-                            if (i > 10) { break; } i++;
-                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
+                            var guser = guild.GetUser(mention.Key);
+                            if (guser != null) {
+                                if (i > 10) { break; }
+                                i++;
+                                say += i + "\t\t" + bestName(guser) + "\t\tmentioned " + mention.Value + " times\n";
+                            }
                         }
                         say = "The top "+ (i - 1) + " most popular users in " + filterChannel.Name +" are:\n" + say;
                     } else {
                         foreach (var mention in mentionsList) {
-                            if (i > 10) { break; } i++;
-                            say += i + "\t\t" + bestName(guild.GetUser(mention.Key)) + "\t\tmentioned " + mention.Value + " times\n";
+                            var guser = guild.GetUser(mention.Key);
+                            if (guser != null) {
+                                if (i > 10) { break; }
+                                i++;
+                                say += i + "\t\t" + bestName(guser) + "\t\tmentioned " + mention.Value + " times\n";
+                            }
                         }
                         say = bestName(filterUser) + "'s " + (i - 1) + " favourite people when chatting in " + filterChannel.Name + " are:\n" + say;
                     }
@@ -747,8 +765,11 @@ namespace Nonon
                         i = 0;
                         if (usersList.Count != 0) {
                             foreach (var user in usersList) {
-                                i++; if (i > 10) { break; }
-                                phrase += i + "\t\t" + guild.GetUser(user.Key) + "\t\thas posted " + user.Value + " reactions\n";
+                                var guser = guild.GetUser(user.Key);
+                                if (guser != null) {
+                                    i++; if (i > 10) { break; }
+                                    phrase += i + "\t\t" + guser + "\t\thas posted " + user.Value + " reactions\n";
+                                }
                             }
                             say += "\n"+ guild.Name +"'s "+i+" biggest reactors are:\n" + phrase;
                         }
