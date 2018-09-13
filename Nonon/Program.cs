@@ -78,9 +78,9 @@ namespace Nonon
             return Task.CompletedTask;
         }
 
-        private async Task MessageReceived(SocketMessage message)
+        private Task MessageReceived(SocketMessage message)
         {
-            try {
+            //try {
                 if (client != null && guild != null) {
                     if (message.Author.Id != client.CurrentUser.Id) {
                         //message came from the outside
@@ -137,8 +137,8 @@ namespace Nonon
                                         StringEater command = new StringEater(message.Content.ToLower());
                                         command.Get(); //remove the mention
                                         if (command.Find("help")) {
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
+                                            Say(message.Channel as SocketTextChannel, message.Author.Mention + ", I sent you the help list.");
+                                            Say(message.Channel as SocketTextChannel, message.Author.Mention + "Keep in mind I'm still kinda WIP and things may break.");
                                             string s = "Here are my commands.\n" +
                                                 "They work in a logical way. Ask for an item to see the counts of that item on the server.\n" +
                                                 "Item can be users, channels, reacts, or mentions.\n" +
@@ -153,7 +153,7 @@ namespace Nonon
                                                 "~~channel <channelname>\t\tShows the stats for this channel.~~\n" +
                                                 "~~server\t\tShows the stats for the server.~~\n" +
                                                 "~~friendships\t\tShows the biggest friendships on the server.~~\n";
-                                            await DirectSay(message.Author, s);
+                                            DirectSay(message.Author, s);
                                         } else if (command.Find("me")) {
                                             Data.User me = null;
                                             string say = ""; string phrase = "";  int i = 0;
@@ -227,7 +227,7 @@ namespace Nonon
                                             if (me == null) {
                                                 say = "Sorry, I don't have any information about you.";
                                             }
-                                            await Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
+                                            Say(message.Channel as SocketTextChannel, message.Author.Mention + say);
                                         } else if (command.Find("top")) {
                                             string selectedItem = null;
                                             string query = null;
@@ -268,19 +268,19 @@ namespace Nonon
                                             }
                                             switch (selectedItem) {
                                             case "channel":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
+                                                Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopChannels(guild, data));
                                                 break;
                                             case "user":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
+                                                Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopUsers(guild, data, inChannel));
                                                 break;
                                             case "mention":
-                                                await Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
+                                                Say(message.Channel as SocketTextChannel,message.Author.Mention +" "+ statistics.TopMentions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopMentions(guild, data, inChannel, byUser));
                                                 break;
                                             case "reaction":
-                                                await Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
+                                                Say(message.Channel as SocketTextChannel, message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 //Console.WriteLine(message.Author.Mention + " " + statistics.TopReactions(guild, data, inChannel, byUser));
                                                 break;
                                             default:
@@ -305,11 +305,11 @@ namespace Nonon
                     Console.WriteLine("client was null");
                 }
                 //await message.Channel.SendMessageAsync(message.Content);
-                //return Task.CompletedTask;
-            } catch (Exception e){
+                return Task.CompletedTask;
+            /*} catch (Exception e){
                 Console.WriteLine(e.Message);
                 //await Say(log,e.Message + "\n```"+e.StackTrace+"```");
-            }
+            }*/
         }
 
         private Task ReactionAdded(Cacheable<IUserMessage, ulong> cacheable, ISocketMessageChannel channel, SocketReaction reaction) {
