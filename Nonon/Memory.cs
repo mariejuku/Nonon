@@ -35,7 +35,6 @@ namespace Nonon {
             foreach (SocketGuildUser user in program.guild.Users) {
                 if (!memory.users.ContainsKey(user.Username)) {
                     memory.AddUser(user);
-                    program.Say(log, "Spotted "+user.Username);
                 }
             }
         }
@@ -181,6 +180,7 @@ namespace Nonon {
             //keep track of present information about discord users to better navigate conversations.
             //such as names, and conversation direction.
             public Concept concept; //relevant concept (information we remember about this user)
+            public SocketUser socketUser;
             public string username;
             public string mention;
             public string nickname;
@@ -189,11 +189,60 @@ namespace Nonon {
             public string speakingTo = null;
             public DateTime lastSpoke = DateTime.MinValue;
 
-            public User(Concept c,SocketGuildUser u) {
+            public User(Concept c, SocketGuildUser u) {
                 concept = c;
+                socketUser = u;
                 username = u.Username;
                 mention = u.Mention;
                 nickname = u.Nickname;
+                GenerateFreeName();
+            }
+
+            public void GenerateFreeName() {
+                //collect all the words in someone's name.
+                string bestName = nickname == null ? username : nickname;
+                Console.WriteLine("testing for: " + bestName);
+                //remove punctuation and emoji from string
+                bestName = new string(bestName.Where(c => (char.IsLetter(c) || char.IsWhiteSpace(c))).ToArray());
+                string[] tokens = bestName.Split(' ');
+                //build a set of scores for each subname.
+                Dictionary<string, int> subNames = new Dictionary<string, int>();
+                int i = 0, score = 0;
+                foreach (string token in tokens) {
+                    if (token.Length > 0) { //don't add empty words
+                        score = 0;
+                        //score by word length. divide by two so that similar lengths score the same. 
+                        score += token.Length / 2;
+                        //score higher if the word appears in the person's username.
+                        if (username.ToLower().Contains(token.ToLower())) {
+                            score += 10;
+                        }
+                        //score higher if the word occurs first in the string.
+                        score += (tokens.Length - i);
+                        if (!subNames.ContainsKey(token)) { subNames.Add(token, score); }
+                        i++;
+                    }
+                }
+                //tokenize the username and also add that into the subName list.
+                //this is to cover the case where someone's name is incomprehensible (eg, if it's made entirely of non-ascii characters)
+                //and it should use their username instead.
+                tokens = username.Split(' ');
+                foreach (string token in tokens) {
+                    if (token.Length > 0) {
+                        if (!subNames.ContainsKey(token)) { subNames.Add(token, 0); }
+                    }
+                }
+                //todo: currently there is no fallback if their username is also incomprehensible. discord allows non ascii characters in usernames.
+                //choose the highest scoring token.
+                score = -1;
+                foreach (var subName in subNames) {
+                    Console.WriteLine(subName.Key + ", " + subName.Value);
+                    if (subName.Value > score) {
+                        score = subName.Value;
+                        freeName = subName.Key;
+                    }
+                }
+                Console.WriteLine("free name:" + freeName);
             }
         }
 
