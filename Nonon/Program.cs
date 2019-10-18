@@ -15,13 +15,13 @@ namespace Nonon
     {
         private string token = "";
         private const string tokenPath = @"C:\nonon\token.txt";
-        //private const long targetGuild = 455136595255885844; //deployed on chlo's server
-        //private const long logChannel = 465508556083429376;
+        //private const long targetGuild = ""; //deployed on chlo's server
+        //private const long logChannel = "";
         private const string statisticsPath = @"C:\nonon\stats.json";
         private const string settingsPath = @"C:\nonon\settings.json";
         private const string memoryPath = @"C:\nonon\memory.json";
-        private const long targetGuild = 313348275455655936; //deployed on my server
-        private const long logChannel = 603035065190187009;
+        private const long targetGuild = ""; //deployed on my server
+        private const long logChannel = "";
         //private const string dataPath = @"C:\nonon\testData.json";
         public DiscordSocketClient client;
         DiscordRestClient rest;
