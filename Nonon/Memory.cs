@@ -17,7 +17,7 @@ namespace Nonon {
         WordNetEngine wordNet;
         string dataPath; //save and load location
         SocketTextChannel log;
-        List<SocketMessage> pastMessages = new List<SocketMessage>(); //used for keeping track of conversation direction
+        Queue<Memory.MessageContainer> pastMessages = new Queue<Memory.MessageContainer>(); //used for keeping track of conversation direction
 
         public MemoryDriver(Program p, string d) {
             program = p; dataPath = d;
@@ -57,30 +57,49 @@ namespace Nonon {
         }
 
         public void Parse (SocketMessage socketMessage) {
+            //interpret a message and gain a variety of information about it.
+            //create a MessageContainer class to store the socketMessage and all of our metadata we found when parsing.
+            Memory.MessageContainer thisMessage = new Memory.MessageContainer(socketMessage);
+            
+            //if the queue is too long lose the last item.
+            if (pastMessages.Count > 10) {
+                pastMessages.Dequeue();
+            }
             string message = socketMessage.Content.ToLower();
             string output = "";
-            
+            output += "There are" + pastMessages.Count + " Past Messages\n";
+            //TASK 1: Recognize the message author.
             //If there is no discord user associated with this message yet, add one.
-            if (!memory.users.ContainsKey(socketMessage.Author.Username)) {
-                memory.AddUser((SocketGuildUser)socketMessage.Author);
-            }
-            //locate the user who spoke.
-            Memory.User user = memory.users[socketMessage.Author.Username];
-            user.speakingTo = FindMessageTarget(socketMessage);
-            message = Unpronounify(message, user);
-            
+            if (!memory.users.ContainsKey(socketMessage.Author.Username)) { memory.AddUser(socketMessage.Author); }
+            //recall who this is from memory.
+            Memory.User messageAuthor = memory.users[socketMessage.Author.Username];
+            //TASK 2: Figure out who the message is directed at.
+            Memory.User messageTarget = FindMessageTarget(socketMessage);
+            //remember this message's target.
+            thisMessage.messageTarget = messageTarget;
+            output += "\nThis message's target is: " + (messageTarget == null ? "null" : messageTarget.username);
+            //update the author's speakingTo for this moment.
+            messageAuthor.speakingTo = messageTarget;
+            output += "\nMessage author " + messageAuthor.username + " is currently speaking to " + (messageTarget == null ? "nobody" : messageAuthor.speakingTo.username);
+            message = Unpronounify(message, messageAuthor);
+
+            //remember that this message occurred.
+            pastMessages.Enqueue(thisMessage);
             program.Say(log, output);
         }
 
-        public string FindMessageTarget(SocketMessage socketMessage) {
-            string messageTarget = null;
+        public Memory.User FindMessageTarget(SocketMessage socketMessage) {
+            string output = "";
+            Memory.User messageTarget = null;
+            string messageTargetUsername = null;
             string authorName = socketMessage.Author.Username;
+            Int32 now = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
             //try to parse who they are speaking to.
             if (socketMessage.MentionedUsers.Count > 0) {
                 //if they mentioned someone then that's pretty easy.
                 foreach (SocketUser mentionedUser in socketMessage.MentionedUsers) {
                     if (mentionedUser.Username != authorName) { //but obviously they arent talking to themselves probably.
-                        messageTarget = mentionedUser.Username;
+                        messageTargetUsername = mentionedUser.Username;
                     }
                 }
             } else {
@@ -91,25 +110,48 @@ namespace Nonon {
                     foreach (var kvp in memory.users) {
                         Memory.User u = kvp.Value;
                         if (u.username.ToLower() == word) {
-                            messageTarget = u.username;
+                            messageTargetUsername = u.username;
                         } else {
-                            if (u.nickname != null) {
-                                if (u.nickname.ToLower() == word) {
-                                    messageTarget = u.username;
-                                }
+                            //this wasn't a username...
+                            if (u.nickname != null && u.nickname.ToLower() == word) {
+                                messageTargetUsername = u.username;
                             } else {
-                                //that user had no nickname to compare against
+                                //this wasn't a nickname...
+                                if (u.freeName != null && u.freeName.ToLower() == word) {
+                                    messageTargetUsername = u.freeName;
+                                } else {
+                                    //this wasn't a free name either. darn.
+                                }
                             }
                         }
                     }
                 }
             }
             if (messageTarget == null) {
-                //well let's see if they said _part_ of someone's name?
-                //maybe someone who is online and has been chatting recently?
+                if (pastMessages.Count > 0) { //can't do this without any past messages you know
+                    //okay well if we still don't know who this message was directed to, let's go through the previous message targets.
+                    Queue<Memory.MessageContainer> relevantMessages = pastMessages;
+                    //run through the relevantMessages and 
+                    // - ignore any that are older then, say, 20 minutes
+                    // - ignore any that have a null messageTarget
+                    while (relevantMessages.Count > 0) {
+                        Memory.MessageContainer messageContainer = relevantMessages.Dequeue();
+                        output += now + " - " + messageContainer.timeStamp + " = " + (now - messageContainer.timeStamp) + " > 1200\n";
+                        //update the messageTarget if every condition is met
+                        if (now - messageContainer.timeStamp < 1200) {
+                            if (messageContainer.messageTarget != null) {
+                                messageTargetUsername = messageContainer.messageTarget.username;
+                            }
+                        }
+                    }
+                }
             }
-
-            //todo: if both these methods failed, check message history and make a guess based on time and proximity.
+            //so now we likely have some kind of identifying key, typically a username. Try to remember who this username belongs to.
+            //if we dont recognize the username, then return a null.
+            if (messageTargetUsername != null) {
+                if (memory.users.ContainsKey(messageTargetUsername)) { messageTarget = memory.users[messageTargetUsername]; }
+            }
+            program.Say(log, output);
             return messageTarget;
         }
 
@@ -133,7 +175,7 @@ namespace Nonon {
                         newWord = messageAuthor.username + " is";
                         break;
                     case "you":
-                        newWord = messageAuthor.speakingTo;
+                        newWord = messageAuthor.speakingTo.username;
                         break;
                     default:
                         newWord = word;
@@ -168,12 +210,12 @@ namespace Nonon {
 
             concepts = new Dictionary<string, Concept>() { };
 
-            users = new Dictionary<string, User>() { };            
+            users = new Dictionary<string, User>() { };
         }
 
-        public void AddUser(SocketGuildUser u) {
-            concepts.Add(u.Username,new Concept());
-            users.Add(u.Username,new User(concepts[u.Username],u));
+        public void AddUser(SocketUser u) {
+            concepts.Add(u.Username, new Concept());
+            users.Add(u.Username, new User(concepts[u.Username], u));
         }
 
         public class User {
@@ -186,15 +228,19 @@ namespace Nonon {
             public string nickname;
             public string freeName;
 
-            public string speakingTo = null;
+            public User speakingTo = null;
             public DateTime lastSpoke = DateTime.MinValue;
 
-            public User(Concept c, SocketGuildUser u) {
+            public User(Concept c, SocketUser u) {
                 concept = c;
                 socketUser = u;
                 username = u.Username;
                 mention = u.Mention;
-                nickname = u.Nickname;
+                nickname = null;
+                try {
+                    SocketGuildUser gu = u as SocketGuildUser;
+                    nickname = gu.Nickname;
+                } catch {}
                 GenerateFreeName();
             }
 
@@ -244,6 +290,22 @@ namespace Nonon {
                 }
                 Console.WriteLine("free name:" + freeName);
             }
+
+            public string ToString() {
+                return username;
+            }
+        }
+
+        public class MessageContainer {
+            //stores the message metadata with the socketMessage
+            public SocketMessage socketMessage;
+            public User messageTarget = null; //the person this message was most likely directed at.
+            public Int32 timeStamp;
+
+            public MessageContainer(SocketMessage sm) {
+                socketMessage = sm;
+                timeStamp = (Int32)(DateTime.UtcNow.Subtract(new DateTime(1970, 1, 1))).TotalSeconds;
+            }
         }
 
         public class Word {
@@ -262,5 +324,7 @@ namespace Nonon {
             List<Concept> propertyOf;
             List<Concept> similarTo;
         }
+
+        
     }
 }
